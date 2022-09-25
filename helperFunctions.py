@@ -19,4 +19,3 @@ def selectingFeatures(df, feature_input, output = None, string_if_single = False
         featuresToApply = featuresToApply[0]
     print (f'features selected: {featuresToApply}')
     return featuresToApply
-
