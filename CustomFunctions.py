@@ -1,3 +1,4 @@
+from helperFunctions import *
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -37,10 +38,11 @@ def exploratoryAnalysis(df, output, feature_selected = None,plot_type = None,fig
     plt.show()
 
 def showDataInfo(df, features_to_display = 'All'):
-    if features_to_display == 'All':
-        featuresToApply = df.columns
-    else:
-        featuresToApply = list(features_to_display)
+    # if features_to_display == 'All':
+    #     featuresToApply = df.columns
+    # else:
+    #     featuresToApply = list(features_to_display)
+    featuresToApply = selectingFeatures(df, features_to_display)
     for col in featuresToApply:
         if df[col].isnull().values.any() == True:
             print(f'{col}: contains missing value, needs handling\n\n')
@@ -81,21 +83,21 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
 def preprocessing(dataframe, preprocess_type, feature_selected, encoder_key = None, convert_to = None,missing_value_handle = None,
                   value_to_remove = None, replace_value = None):
     df = dataframe
-    if len(feature_selected) == 1:
-        feature_selected = feature_selected[0]
+    # if len(feature_selected) == 1:
+    #     feature_selected = feature_selected[0]
+    feature_selected = selectingFeatures(dataframe, feature_selected)
     if preprocess_type == 'featToRemove':
         df = df.drop(columns = feature_selected, inplace = False)
     elif preprocess_type == 'oneHotEncode':
         for f in feature_selected:
             df = encode_onehot(df,f)
     elif preprocess_type == 'ordinalEncode':
-        # oEncoder = OrdinalEncoder(categories = encoder_key)
-        # # print (dir(OrdinalEncoder))
-        # # print (oEncoder.n_features_in_)
-        # # print (oEncoder.categories_)
-        # # df[featureSelected] = oEncoder.fit_transform(df[featureS_slected])
-        # df['Type'] = oEncoder.fit_transform(df['Type'])
-        df[feature_selected] = df[feature_selected].map(encoder_key)
+        if type(encoder_key) is list:
+            oEncoder = OrdinalEncoder(categories = [encoder_key])
+            df[feature_selected] = oEncoder.fit_transform(df[feature_selected])
+        elif type(encoder_key) is dict:
+            feature_selected = selectingFeatures(dataframe, feature_selected,string_if_single=True)
+            df[feature_selected] = df[feature_selected].map(encoder_key)
     elif preprocess_type == 'minMaxScaler':
         df[feature_selected] = MinMaxScaler().fit_transform(df[feature_selected])
     elif preprocess_type == 'dataTypeConvert':
@@ -116,21 +118,6 @@ def preprocessing(dataframe, preprocess_type, feature_selected, encoder_key = No
             df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
     return df
 
-def stringToList(string, seperator = ','):
-    return [x.strip() for x in string.split(seperator)]
-def selectingFeatures(df, feature_input):
-    featuresToApply = None
-    if feature_input == 'All':
-        featuresToApply = list(df.columns)
-        featuresToApply.remove(output)
-    elif (type(feature_input) == list):
-        featuresToApply = feature_input
-    elif (type(feature_input) == str):
-        featuresToApply = [feature_input]
-    elif type(feature_input) == tuple:
-        featuresToApply = list(feature_input)
-    print (f'features selected: {featuresToApply}')
-    return featuresToApply
 def encode_onehot(df, f):
     df2 = pd.get_dummies(df[f], prefix='', prefix_sep='').groupby(level=0, axis=1).max().add_prefix(f+' - ')
     df3 = pd.concat([df, df2], axis=1)

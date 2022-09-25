@@ -12,5 +12,6 @@ df2 = preprocessing(df,preprocess_type = 'featToRemove', feature_selected = ['\u
 
 featuresToScale = ['Air temperature [K]','Process temperature [K]','Rotational speed [rpm]','Torque [Nm]','Tool wear [min]']
 df3 = preprocessing(df2, preprocess_type='minMaxScaler',feature_selected=featuresToScale)
-df4 = preprocessing(df3, preprocess_type='ordinalEncode', feature_selected= ['Type'], encoder_key = {'H':2,'M':1,'L':0})
-showDataInfo(df4)
+#df4 = preprocessing(df3, preprocess_type='ordinalEncode', feature_selected= ('Type'), encoder_key = {'H':2,'M':1,'L':0})
+df4 = preprocessing(df3, preprocess_type='ordinalEncode', feature_selected= ('Type'), encoder_key = ['H','M','L'])
+showDataInfo(df4, ['Type'] )
