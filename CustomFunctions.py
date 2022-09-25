@@ -81,35 +81,39 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
 def preprocessing(dataframe, preprocess_type, feature_selected, encoder_key = None, convert_to = None,missing_value_handle = None,
                   value_to_remove = None, replace_value = None):
     df = dataframe
-    featureSelected = stringToList(feature_selected)
-    if len(featureSelected) == 1:
-        featureSelected = feature_selected
+    if len(feature_selected) == 1:
+        feature_selected = feature_selected[0]
     if preprocess_type == 'featToRemove':
-        df = df.drop(columns = featureSelected, inplace = False)
+        df = df.drop(columns = feature_selected, inplace = False)
     elif preprocess_type == 'oneHotEncode':
-        for f in featureSelected:
+        for f in feature_selected:
             df = encode_onehot(df,f)
     elif preprocess_type == 'ordinalEncode':
-        oEncoder = OrdinalEncoder(categories = [encoder_key])
-        df[featureSelected] = oEncoder.fit_transform(df[featureSelected])
+        # oEncoder = OrdinalEncoder(categories = encoder_key)
+        # # print (dir(OrdinalEncoder))
+        # # print (oEncoder.n_features_in_)
+        # # print (oEncoder.categories_)
+        # # df[featureSelected] = oEncoder.fit_transform(df[featureS_slected])
+        # df['Type'] = oEncoder.fit_transform(df['Type'])
+        df[feature_selected] = df[feature_selected].map(encoder_key)
     elif preprocess_type == 'minMaxScaler':
-        df[featureSelected] = MinMaxScaler().fit_transform(df[featureSelected])
+        df[feature_selected] = MinMaxScaler().fit_transform(df[feature_selected])
     elif preprocess_type == 'dataTypeConvert':
         if convert_to == 'integer':
-            df[featureSelected] = df[featureSelected].astype(int)
+            df[feature_selected] = df[feature_selected].astype(int)
         elif convert_to == 'float':
-            df[featureSelected] = df[featureSelected].astype(float)
+            df[feature_selected] = df[feature_selected].astype(float)
         elif convert_to == 'string':
-            df[featureSelected] = df[featureSelected].astype(str)
+            df[feature_selected] = df[feature_selected].astype(str)
     elif preprocess_type == 'handleMissingValue':
         if missing_value_handle == 'removeMissingValue':
-            df.dropna(subset=featureSelected, inplace = True)
+            df.dropna(subset=feature_selected, inplace = True)
         elif missing_value_handle == 'removeSpecificValue':
-            df[featureSelected] = df[featureSelected].replace(value_to_remove,np.NaN)
-            df.dropna(subset=featureSelected, inplace=True)
+            df[feature_selected] = df[feature_selected].replace(value_to_remove,np.NaN)
+            df.dropna(subset=feature_selected, inplace=True)
         elif missing_value_handle == 'replaceValue':
             print('replace values:', replace_value[0], replace_value[1])
-            df[featureSelected] = df[featureSelected].replace(replace_value[0], replace_value[1])
+            df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
     return df
 
 def stringToList(string, seperator = ','):
