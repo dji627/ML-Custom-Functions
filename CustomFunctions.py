@@ -5,9 +5,10 @@ import seaborn as sns
 from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler
+from scipy.stats import boxcox
+
 def importFile(file_path, file_name, column_names = None, sep = None, show_dataFrame = False):
     filePath = file_path + file_name
-
     if column_names != None:
         column_names = stringToList(column_names)
     if (type(column_names) == list): #check to see if column names are provided
@@ -19,23 +20,36 @@ def importFile(file_path, file_name, column_names = None, sep = None, show_dataF
         print(df.head(show_dataFrame))
     return df
 
-def exploratoryAnalysis(df, output, feature_selected = None,plot_type = None,fig_size_y = 15, fig_size_x = 30):
-    # if feature_selected != None:
-    #     featuresToApply = list(feature_selected)
+def showGraph(df, output, feature_selected = 'All',plot_type = None,fig_size_y = 15, fig_size_x = 30,set_yscale = None,
+              set_xscale =None, kde = False, show_corrlation = False):
     featuresToApply = selectingFeatures(df, feature_input= feature_selected, output = output)
-    plt.figure(figsize = (fig_size_y, fig_size_x))
-    plotCol = min(len(featuresToApply),3)
-    for i, feature in enumerate(featuresToApply):
-        plt.subplot(len(featuresToApply), plotCol, i + 1)
-        if plot_type == 'scatter':
-            sns.scatterplot(data=df, x=feature, y=output, legend='auto')
-        elif plot_type == 'histo':
-            sns.histplot(data=df, x=feature, hue=output, multiple='stack')
-        elif plot_type == 'box':
-            sns.boxplot(x=df[feature])
-        elif plot_type == 'pair':
-            sns.pairplot(df, hue=output, vars=feature)
-    plt.show()
+    if plot_type != None:
+        plt.figure(figsize = (fig_size_y, fig_size_x))
+        plotCol = min(len(featuresToApply),3)
+        for i, feature in enumerate(featuresToApply):
+            plt.subplot(len(featuresToApply), plotCol, i + 1)
+            if plot_type == 'scatter':
+                g = sns.scatterplot(data=df, x=feature, y=output, legend='auto')
+            elif plot_type == 'histo':
+                g = sns.histplot(data=df, x=feature, hue=output, multiple='stack', kde = kde)
+            elif plot_type == 'box':
+                g = sns.boxplot(x=df[feature])
+            elif plot_type == 'pair':
+                g = sns.pairplot(df, hue=output, vars=feature)
+            if set_yscale == 'log':
+                g.set_yscale(set_yscale)
+        plt.show()
+def exploreFeatures(df, feature_selected = 'All', exploration_type = None,fig_size_y = 15, fig_size_x = 30):
+    featuresToApply = selectingFeatures(df,feature_input=feature_selected)
+    if exploration_type == 'correlation' or 'heatMap:':
+        correlationMatrix = df[featuresToApply].corr()
+        print (correlationMatrix)
+        if exploration_type == 'heatMap':
+            plt.figure(figsize=(fig_size_y, fig_size_x))
+            sns.heatmap(correlationMatrix,annot = True)
+            plt.show()
+
+
 
 def showDataInfo(df, features_to_display = 'All', show_data_frame = True, show_rows = 5, show_data_type = False):
     print ('Function: showDataInfo called')
@@ -54,14 +68,15 @@ def showDataInfo(df, features_to_display = 'All', show_data_frame = True, show_r
             mean = df[col].mean()
             mode = df[col].mode()
             std = df[col].std()
+            skewness = df[col].skew()
             print(f'{col}: Max:{max}, Min:{min}, Median:{median:.3f}'
-                                         f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}\n\n')
+                                         f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}, Skewness:{skewness:.3f}')
         elif is_object_dtype(df[col]) == True:
             uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
             print(f'{col}({len(uniqueVal)} unique values:)')
             for value, count in zip(uniqueVal, uniqueCount):
                 print (f'{value}: {count}')
-
+        print('\n')
 def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = None, ordinal_encode = None,
                   apply_log=None, remove_outlier = None,min_max_scaler = None, remove_feature = None,
                   convert_feature = None, convert_to = None):
@@ -82,9 +97,9 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
         print (f'removed outlier for features: {featuresToApply}')
     return df
 
-def preprocessing(dataframe, preprocess_type, feature_selected, encoder_key = None, convert_to = None,missing_value_handle = None,
-                  value_to_remove = None, replace_value = None):
-    print ('Function: preprocessing2 called')
+def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_key = None, convert_to = None,missing_value_handle = None,
+                  value_to_remove = None, replace_value = None, skew_transformation = 'boxCox'):
+    print ('Function: preprocessing called')
     df = dataframe
     feature_selected = selectingFeatures(dataframe, feature_selected)
     if preprocess_type == 'featToRemove':
@@ -119,6 +134,17 @@ def preprocessing(dataframe, preprocess_type, feature_selected, encoder_key = No
         elif missing_value_handle == 'replaceValue':
             print('replace values:', replace_value[0], replace_value[1])
             df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
+    elif preprocess_type == 'handleSkewedData':
+        if skew_transformation == 'boxCox':
+            for i in feature_selected:
+                df[i],lmbda = boxcox(df[i],lmbda=None)
+        elif skew_transformation == 'squareRoot':
+            df[feature_selected] = df[feature_selected]**(.5)
+        elif skew_transformation == 'reciprocal':
+            df[feature_selected] = 1/df[feature_selected]
+        elif skew_transformation == 'log':
+            df[feature_selected] = np.log(df[feature_selected])
+
     return df
 
 def encode_onehot(df, feature_selected):
