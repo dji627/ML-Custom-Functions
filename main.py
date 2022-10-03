@@ -28,4 +28,16 @@ df5 = preprocessing(df4,feature_selected='Rotational speed [rpm]', preprocess_ty
 df6 = preprocessing(df5,feature_selected='Rotational speed [rpm]',preprocess_type='minMaxScaler')
 showDataInfo(df6)
 
-showGraph(df6,output = 'Failure Type',feature_selected='Rotational speed [rpm],Target', plot_type='histo',set_yscale='log',kde = False)
+# showGraph(df6,output = 'Failure Type',feature_selected='Rotational speed [rpm],Target', plot_type='histo',set_yscale='log',kde = False)
+
+cls = GaussianNB()
+cls = SVC()
+cls = MLPClassifier()
+cls = DecisionTreeClassifier()
+cls = RandomForestClassifier()
+cls = KNeighborsClassifier()
+# crossValidate(df6,output = 'Failure Type',model = cls,shuffle = True,random_state=0,metric = 'accuracy')
+
+xTrain, xTest, yTrain, yTest = trainTestSplit(df6,output='Failure Type', test_size= 0.2, train_size=0.8, stratify = True)
+print (fitAndEvaulateModel(xTrain,xTest,yTrain,yTest,model = cls,metricList='accuracy,f1,precision,recall,confusionMatrix'))
+

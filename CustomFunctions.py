@@ -5,7 +5,16 @@ import seaborn as sns
 from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler
-from scipy.stats import boxcox
+from sklearn.model_selection import KFold, StratifiedKFold
+from scipy.stats import boxcox, stats
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import *
 
 def importFile(file_path, file_name, column_names = None, sep = None, show_dataFrame = False):
     filePath = file_path + file_name
@@ -153,3 +162,75 @@ def encode_onehot(df, feature_selected):
     df3 = pd.concat([df, df2], axis=1)
     df3 = df3.drop([featureSelected], axis = 1)
     return df3
+
+def trainTestSplit(df,output,test_size = None, train_size = None, random_state = None, shuffle = True, stratify = None):
+    from sklearn.model_selection import train_test_split
+    x = df.loc[:,df.columns != output].values
+    y = df.loc[:,df.columns == output].values.ravel()
+    if stratify == True:
+        stratify = y
+    xTrain, xTest, yTrain, yTest = train_test_split(x, y, test_size = test_size, train_size=train_size,random_state=random_state, shuffle=shuffle, stratify=stratify)
+    return xTrain, xTest, yTrain, yTest
+
+def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None):
+    model.fit(xTrain, yTrain)
+    yPred = model.predict(xTest)
+    numOfClass = len(model.classes_) #num of output classes
+    metricDict = {'accuracy':accuracy_score,
+                  'f1':f1_score,
+                  'precision':precision_score,
+                  'recall':recall_score,
+                  'logLoss':log_loss,
+                  'rocAuc':roc_auc_score,
+                  'confusionMatrix':confusion_matrix}
+    evalMetric = {}
+    metricList = convertToList(metricList) #convert input to list form
+    for metric in metricList:
+        print(metric)
+        if metric in ['f1','precision','recall']:
+            if numOfClass == 2: #if the output is binary
+                evalMetric['f1_binary'] = metricDict[metric](yTest, yPred,average = 'binary')
+            evalMetric['f1'] = metricDict[metric](yTest,yPred, average = None)
+            for metric_f1 in ['micro','macro','weighted']:
+                evalMetric['f1_'+metric_f1] = metricDict[metric](yTest, yPred, average = metric_f1)
+        elif metric in ['rocAuc']:
+            yPred_prob = model.predict_proba(xTest)
+            print (yPred_prob)
+            if numOfClass == 2: #if the output is binary
+                evalMetric['f1_binary'] = metricDict[metric](yTest, yPred_prob ,average = 'binary',multi_class = 'ovr')
+            evalMetric['f1'] = metricDict[metric](yTest,yPred, average = None,multi_class = 'ovr')
+            for metric_f1 in ['micro','macro','weighted']:
+                evalMetric['f1_'+metric_f1] = metricDict[metric](yTest, yPred, average = metric_f1,multi_class = 'ovr')
+        else:
+            print(metric)
+            evalMetric[metric] = metricDict[metric](yTest,yPred)
+            if metric == 'confusionMatrix':
+                disp = ConfusionMatrixDisplay(confusion_matrix=evalMetric[metric],display_labels=model.classes_)
+                disp.plot()
+                plt.show()
+
+
+    # for metric in metricList:
+    #     if metric == 'accuracy':
+    #         evalMetric.append(accuracy_score(yTest, yPred))
+    #     elif metric == 'f1':
+    #         evalMetric.append(f1_score(yTest,yPred))
+    #     elif metric == 'precision':
+    #         evalMetric.append(precision_score(yTest,yPred))
+    #     elif metric == 'recall':
+    #         evalMetric.append(recall_score(yTest,yPred))
+    #     elif metric == 'logLoss':
+    #         evalMetric.append(log_loss(yTest,yPred))
+    #     elif metric == 'rocAuc':
+    #         evalMetric.append(roc_auc_score(yTest,yPred))
+    return evalMetric
+
+def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state = None, metric = None):
+    x = df.loc[:, df.columns != output].values
+    y = df.loc[:, df.columns == output].values.ravel()
+    metricList = []
+    kf = StratifiedKFold(n_splits = n_splits, shuffle = shuffle, random_state = random_state)
+    for trainIndex, testIndex in kf.split(x,y): #looping through the train and test set indices for the splits
+        evalMetric = fitAndEvaulateModel(x[trainIndex], x[testIndex], y[trainIndex], y[testIndex], model, metric = metric)
+        metricList += [evalMetric]
+    print(f'{model} : {n_splits} fold cross validation result: {np.mean(metricList):.3f}+/-{np.std(metricList):.3f}')

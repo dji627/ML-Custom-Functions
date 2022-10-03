@@ -19,3 +19,11 @@ def selectingFeatures(df, feature_input, output = None, remove_output = False, s
         featuresToApply = featuresToApply[0]
     print (f'features selected: {featuresToApply}')
     return featuresToApply
+
+def convertToList(input):
+    if type(input) == list:
+        return input
+    elif type(input) == str:
+        return stringToList(input)
+    elif type(input) == tuple:
+        return list(input)
