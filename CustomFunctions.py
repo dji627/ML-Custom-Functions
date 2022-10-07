@@ -29,7 +29,7 @@ def importFile(file_path, file_name, column_names = None, sep = None, show_dataF
         print(df.head(show_dataFrame))
     return df
 
-def showGraph(df, output, feature_selected = 'All',plot_type = None,fig_size_y = 15, fig_size_x = 30,set_yscale = None,
+def showGraph(df, output=None, feature_selected = 'All',plot_type = None,fig_size_y = 15, fig_size_x = 30,set_yscale = None,
               set_xscale =None, kde = False, show_corrlation = False):
     featuresToApply = selectingFeatures(df, feature_input= feature_selected, output = output)
     if plot_type != None:
@@ -45,6 +45,12 @@ def showGraph(df, output, feature_selected = 'All',plot_type = None,fig_size_y =
                 g = sns.boxplot(x=df[feature])
             elif plot_type == 'pair':
                 g = sns.pairplot(df, hue=output, vars=feature)
+            elif plot_type == 'summaryPlot':
+                if is_float_dtype(df[feature]) or is_int64_dtype(df[feature]):
+                    g = sns.boxplot(data=df, x=feature, hue=output)
+                    print('feature is a number')
+                elif is_object_dtype(df[feature]):
+                    g = sns.countplot(data=df,x=feature, hue=output)
             if set_yscale == 'log':
                 g.set_yscale(set_yscale)
         plt.show()
@@ -208,21 +214,6 @@ def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None):
                 disp = ConfusionMatrixDisplay(confusion_matrix=evalMetric[metric],display_labels=model.classes_)
                 disp.plot()
                 plt.show()
-
-
-    # for metric in metricList:
-    #     if metric == 'accuracy':
-    #         evalMetric.append(accuracy_score(yTest, yPred))
-    #     elif metric == 'f1':
-    #         evalMetric.append(f1_score(yTest,yPred))
-    #     elif metric == 'precision':
-    #         evalMetric.append(precision_score(yTest,yPred))
-    #     elif metric == 'recall':
-    #         evalMetric.append(recall_score(yTest,yPred))
-    #     elif metric == 'logLoss':
-    #         evalMetric.append(log_loss(yTest,yPred))
-    #     elif metric == 'rocAuc':
-    #         evalMetric.append(roc_auc_score(yTest,yPred))
     return evalMetric
 
 def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state = None, metric = None):
@@ -234,3 +225,19 @@ def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state
         evalMetric = fitAndEvaulateModel(x[trainIndex], x[testIndex], y[trainIndex], y[testIndex], model, metric = metric)
         metricList += [evalMetric]
     print(f'{model} : {n_splits} fold cross validation result: {np.mean(metricList):.3f}+/-{np.std(metricList):.3f}')
+
+def gridSearch(df, output, model, param_grid, scoring = None, n_jobs = None, refit = True, cv = 5, verbose = 0,
+        pre_dispatch = None, error_score = np.nan, return_train_score = False, show_graph = None, print_results = None):
+    x = df.loc[:, df.columns != output].values
+    y = df.loc[:, df.columns == output].values.ravel()
+    from sklearn.model_selection import GridSearchCV
+    gs = GridSearchCV(estimator = model, param_grid = param_grid, scoring = scoring, n_jobs = n_jobs,  refit = refit,
+                      cv = cv, verbose = verbose, pre_dispatch = pre_dispatch, error_score = error_score, return_train_score = return_train_score)
+
+    gs.fit(x,y)
+    print(gs.scorer_)
+    if print_results != None:
+        dfResults = pd.DataFrame(gs.cv_results_)
+        print (dfResults.to_string())
+        #plotGridSearch(dfResults, param_grid = param_grid)
+    return gs.best_params_
