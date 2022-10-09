@@ -6,8 +6,8 @@ df = importFile(filePath, fileName, show_dataFrame = 10)
 features = df.columns.values.tolist()
 print(features)
 
-showGraph(df,output='Failure Type', plot_type='summaryPlot')
-exit()
+#showGraph(df,output='Failure Type', plot_type='summaryPlot')
+
 #exploratoryAnalysis(df, output = 'Failure Type', feature_selected=None,plot_type='histo',fig_size_y = 20,fig_size_x = 40)
 df2 = preprocessing(df,preprocess_type = 'featToRemove', feature_selected = ['\ufeffUDI', 'Product ID'])
 
@@ -36,10 +36,12 @@ cls = GaussianNB()
 cls = SVC()
 cls = MLPClassifier()
 cls = DecisionTreeClassifier()
-cls = RandomForestClassifier()
-cls = KNeighborsClassifier()
+gridSearch(df6,output='Failure Type', model=cls, param_grid={'criterion':['gini','entropy'],'min_samples_leaf':[2,3],'max_features':['auto','log2','sqrt']},
+           return_train_score=True, show_graph=True,print_results=True)
+# cls = RandomForestClassifier()
+# cls = KNeighborsClassifier()
 # crossValidate(df6,output = 'Failure Type',model = cls,shuffle = True,random_state=0,metric = 'accuracy')
 
-xTrain, xTest, yTrain, yTest = trainTestSplit(df6,output='Failure Type', test_size= 0.2, train_size=0.8, stratify = True)
-print (fitAndEvaulateModel(xTrain,xTest,yTrain,yTest,model = cls,metricList='accuracy,f1,precision,recall,confusionMatrix'))
+# xTrain, xTest, yTrain, yTest = trainTestSplit(df6,output='Failure Type', test_size= 0.2, train_size=0.8, stratify = True)
+# print (fitAndEvaulateModel(xTrain,xTest,yTrain,yTest,model = cls,metricList='accuracy,f1,precision,recall,confusionMatrix'))
 

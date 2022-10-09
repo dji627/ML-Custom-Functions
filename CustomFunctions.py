@@ -1,3 +1,5 @@
+import math
+
 from helperFunctions import *
 import pandas as pd
 import numpy as np
@@ -239,5 +241,72 @@ def gridSearch(df, output, model, param_grid, scoring = None, n_jobs = None, ref
     if print_results != None:
         dfResults = pd.DataFrame(gs.cv_results_)
         print (dfResults.to_string())
-        #plotGridSearch(dfResults, param_grid = param_grid)
+    if show_graph != None:
+        plotGridSearch(dfResults, param_grid = param_grid)
     return gs.best_params_
+
+def plotGridSearch(df_results, param_grid, fig_size_y = 15, fig_size_x = 30):
+    paramList = list(param_grid.keys()) #put grid keys to a list
+    gridKeyHeaders = ['param_' + param for param in paramList] #convert the parameter to match the column headers cv_results
+    print (gridKeyHeaders)
+    gridKeyHeaders.reverse()
+    print (gridKeyHeaders)
+    df_results.sort_values(by = gridKeyHeaders, inplace=True)
+    print (df_results.to_string())
+
+    scoresMean = df_results['mean_test_score']
+    #plot Grid Search Scores
+    if len(paramList) == 1:
+        scoresMean = np.array(scoresMean)
+        plt.plot(param_grid[paramList[0]], scoresMean)
+        plt.title('Grid Search Scores')
+        plt.xlabel(paramList[0])
+        plt.ylabel('CV Average Score')
+        plt.legend()
+        plt.show()
+    elif len(paramList) == 2:
+        # get Test Scores Mean and std for each grid search
+        print(f'{param_grid[paramList[0]]} length: {len(param_grid[paramList[0]])}')
+        print(f'{param_grid[paramList[1]]} length: {len(param_grid[paramList[1]])}')
+        scoresMean = np.array(scoresMean).reshape(len(param_grid[paramList[1]]), len(param_grid[paramList[0]]))
+        print(scoresMean)
+        for idx, val in enumerate(param_grid[paramList[1]]):
+            # print ('idx:',idx, '  val:',val)
+            # print ('scoresMean:',scoresMean[idx,:])
+            plt.plot(param_grid[paramList[0]], scoresMean[idx,:], '-o', label = paramList[1] + ': ' + str(val))
+            plt.title('Grid Search Scores')
+            plt.xlabel(paramList[0])
+            plt.ylabel('CV Average Score')
+            plt.legend()
+        plt.show()
+    elif len(paramList) == 3:
+        dfList = []
+        plt.figure(figsize=(fig_size_y, fig_size_x))
+        plotCol = min(len(paramList[2]), 2)
+        for plotId, param in enumerate(param_grid[paramList[2]]):
+            df = df_results[df_results[gridKeyHeaders[0]] == param]# seperating the df_result based on the unique values of paramList[2], gridKeyHeaders is the reverse of paramList
+            dfList += [df]
+            scoresMean = df['mean_test_score']
+            scoresMean = np.array(scoresMean).reshape(len(param_grid[paramList[1]]), len(param_grid[paramList[0]]))
+            subplot = plt.subplot(len(paramList[2]), plotCol, plotId + 1)
+            for idx, val in enumerate(param_grid[paramList[1]]):
+                subplot.plot(param_grid[paramList[0]], scoresMean[idx, :], '-o', label=paramList[1] + ': ' + str(val))
+                subplot.set_title(f'Grid Search Scores: {paramList[2]}={param}')
+                subplot.set_xlabel(paramList[0])
+                subplot.set_ylabel('CV Average Score')
+                subplot.legend()
+        plt.show()
+def creatingSubplots(feature_input, plot_column_size = 2, sharex = False, sharey = False):
+    featNum = len(feature_input)
+    plot_row_size = int(math.ceil(featNum/plot_column_size))
+    fig, ax = plt.subplots(plot_row_size, plot_column_size, sharex = sharex, sharey = sharey)  # subpolt with # of rows and columns defined above
+    subplotList = []  # store subplot axis in a linear array
+    for i in range(0, plot_row_size):
+        for j in range(0, plot_column_size):
+            if plot_column_size == 1:
+                subplotList += [ax[i]]
+            elif plot_row_size == 1:
+                subplotList += [ax[j]]
+            elif plot_row_size > 1:
+                subplotList += [ax[i, j]]
+    return subplotList
