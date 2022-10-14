@@ -1,3 +1,7 @@
+from itertools import cycle
+
+import collections
+
 import math
 
 from helperFunctions import *
@@ -6,7 +10,7 @@ import numpy as np
 import seaborn as sns
 from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler
+from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler,label_binarize
 from sklearn.model_selection import KFold, StratifiedKFold
 from scipy.stats import boxcox, stats
 
@@ -180,9 +184,11 @@ def trainTestSplit(df,output,test_size = None, train_size = None, random_state =
     xTrain, xTest, yTrain, yTest = train_test_split(x, y, test_size = test_size, train_size=train_size,random_state=random_state, shuffle=shuffle, stratify=stratify)
     return xTrain, xTest, yTrain, yTest
 
-def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None):
-    model.fit(xTrain, yTrain)
+def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None, rocCurve = None, class_to_show = None):
+
+    model = model.fit(xTrain, yTrain)
     yPred = model.predict(xTest)
+    yPred_prob = model.predict_proba(xTest)
     numOfClass = len(model.classes_) #num of output classes
     metricDict = {'accuracy':accuracy_score,
                   'f1':f1_score,
@@ -190,44 +196,140 @@ def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None):
                   'recall':recall_score,
                   'logLoss':log_loss,
                   'rocAuc':roc_auc_score,
-                  'confusionMatrix':confusion_matrix}
+                  'confusionMatrix':confusion_matrix,
+                  'classificationReport':classification_report,
+                  'MAE':mean_absolute_error,
+                  'MSE':mean_squared_error,
+                  'RMSE':mean_squared_error,
+                  'R2':r2_score}
     evalMetric = {}
     metricList = convertToList(metricList) #convert input to list form
     for metric in metricList:
-        print(metric)
         if metric in ['f1','precision','recall']:
+            evalMetric['f1'] = metricDict[metric](yTest, yPred, average=None)
             if numOfClass == 2: #if the output is binary
                 evalMetric['f1_binary'] = metricDict[metric](yTest, yPred,average = 'binary')
-            evalMetric['f1'] = metricDict[metric](yTest,yPred, average = None)
-            for metric_f1 in ['micro','macro','weighted']:
-                evalMetric['f1_'+metric_f1] = metricDict[metric](yTest, yPred, average = metric_f1)
+            else:
+                for metric_f1 in ['micro','macro','weighted']:
+                    evalMetric['f1_'+metric_f1] = metricDict[metric](yTest, yPred, average = metric_f1)
         elif metric in ['rocAuc']:
-            yPred_prob = model.predict_proba(xTest)
-            print (yPred_prob)
+            evalMetric['rocAuc'] = metricDict[metric](yTest,yPred_prob, average = None,multi_class = 'ovr')
             if numOfClass == 2: #if the output is binary
-                evalMetric['f1_binary'] = metricDict[metric](yTest, yPred_prob ,average = 'binary',multi_class = 'ovr')
-            evalMetric['f1'] = metricDict[metric](yTest,yPred, average = None,multi_class = 'ovr')
-            for metric_f1 in ['micro','macro','weighted']:
-                evalMetric['f1_'+metric_f1] = metricDict[metric](yTest, yPred, average = metric_f1,multi_class = 'ovr')
+                evalMetric['rocAuc_binary'] = metricDict[metric](yTest, yPred_prob ,average = 'binary',multi_class = 'raise')
+            else:
+                for metric_f1 in ['macro','weighted']:
+                    evalMetric['rocAuc_'+metric_f1] = metricDict[metric](yTest, yPred_prob, average = metric_f1,multi_class = 'ovr')
+            if rocCurve != None:
+                # Compute ROC curve and ROC area for each class
+                fpr = dict()
+                tpr = dict()
+                roc_auc = dict()
+                # yScore = model.decision_function(xTest)
+                yScore = yPred_prob
+                yTest = label_binarize(yTest, classes =model.classes_)
+                for i, c in enumerate(model.classes_):
+                    fpr[c], tpr[c], _ = roc_curve(yTest[:,i], yScore[:,i])
+                    roc_auc[c] = auc(fpr[c],tpr[c])
+                # Compute micro-average ROC curve and ROC area
+                fpr['micro'], tpr['micro'], _ = roc_curve(y_true = yTest.ravel(), y_score=yScore.ravel())
+                roc_auc['micro'] = auc(fpr['micro'], tpr['micro'])
+                if rocCurve == 'micro':
+                    plt.figure()
+                    lw = 2
+                    plt.plot(
+                        fpr[class_to_show],
+                        tpr[class_to_show],
+                        color="darkorange",
+                        lw=lw,
+                        label= "ROC curve-" + class_to_show +"(area = %0.2f)" % roc_auc[class_to_show],
+                    )
+                    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel("False Positive Rate")
+                    plt.ylabel("True Positive Rate")
+                    plt.title("Receiver operating characteristic")
+                    plt.legend(loc="lower right")
+                    plt.show()
+                elif rocCurve == 'macro':
+                    # First aggregate all false positive rates
+                    all_fpr = np.unique(np.concatenate([fpr[i] for i in model.classes_]))
+
+                    # Then interpolate all ROC curves at this points
+                    mean_tpr = np.zeros_like(all_fpr)
+                    for i in model.classes_:
+                        mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
+
+                    # Finally average it and compute AUC
+                    mean_tpr /= numOfClass
+
+                    fpr["macro"] = all_fpr
+                    tpr["macro"] = mean_tpr
+                    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+
+                    # Plot all ROC curves
+                    plt.figure()
+                    plt.plot(
+                        fpr["micro"],
+                        tpr["micro"],
+                        label="micro-average ROC curve (area = {0:0.2f})".format(roc_auc["micro"]),
+                        color="deeppink",
+                        linestyle=":",
+                        linewidth=4,
+                    )
+
+                    plt.plot(
+                        fpr["macro"],
+                        tpr["macro"],
+                        label="macro-average ROC curve (area = {0:0.2f})".format(roc_auc["macro"]),
+                        color="navy",
+                        linestyle=":",
+                        linewidth=4,
+                    )
+
+                    colors = cycle(["aqua", "darkorange", "cornflowerblue"])
+                    for i, color in zip(model.classes_, colors):
+                        plt.plot(
+                            fpr[i],
+                            tpr[i],
+                            color=color,
+                            lw=2,
+                            label="ROC curve of class {0} (area = {1:0.2f})".format(i, roc_auc[i]),
+                        )
+
+                    plt.plot([0, 1], [0, 1], "k--", lw=2)
+                    plt.xlim([0.0, 1.0])
+                    plt.ylim([0.0, 1.05])
+                    plt.xlabel("False Positive Rate")
+                    plt.ylabel("True Positive Rate")
+                    plt.title("Some extension of Receiver operating characteristic to multiclass")
+                    plt.legend(loc="lower right")
+                    plt.show()
+
+
         else:
-            print(metric)
             evalMetric[metric] = metricDict[metric](yTest,yPred)
             if metric == 'confusionMatrix':
                 disp = ConfusionMatrixDisplay(confusion_matrix=evalMetric[metric],display_labels=model.classes_)
                 disp.plot()
                 plt.show()
+            if metric == 'classificationReport':
+                print (evalMetric[metric])
     return evalMetric
 
-def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state = None, metric = None):
+def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state = None, metricList = None):
     x = df.loc[:, df.columns != output].values
     y = df.loc[:, df.columns == output].values.ravel()
-    metricList = []
+    metricHash = collections.defaultdict(list) #hashtable with a list value
     kf = StratifiedKFold(n_splits = n_splits, shuffle = shuffle, random_state = random_state)
     for trainIndex, testIndex in kf.split(x,y): #looping through the train and test set indices for the splits
-        evalMetric = fitAndEvaulateModel(x[trainIndex], x[testIndex], y[trainIndex], y[testIndex], model, metric = metric)
-        metricList += [evalMetric]
-    print(f'{model} : {n_splits} fold cross validation result: {np.mean(metricList):.3f}+/-{np.std(metricList):.3f}')
-
+        evalMetric = fitAndEvaulateModel(x[trainIndex], x[testIndex], y[trainIndex], y[testIndex], model, metricList = metricList)
+        for m in evalMetric.keys():
+            metricHash[m].append(evalMetric[m])
+    # print(f'{model} : {n_splits} fold cross validation result: {np.mean(metricList):.3f}+/-{np.std(metricList):.3f}')
+    print(f'{model}: {n_splits} fold cross validation result:')
+    for m in metricHash:
+        print(f'{m}: {np.mean(metricHash[m]):.3f}+/-{np.std(metricHash[m]):.3f}')
 def gridSearch(df, output, model, param_grid, scoring = None, n_jobs = None, refit = True, cv = 5, verbose = 0,
         pre_dispatch = None, error_score = np.nan, return_train_score = False, show_graph = None, print_results = None):
     x = df.loc[:, df.columns != output].values
