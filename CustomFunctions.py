@@ -287,7 +287,7 @@ def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None, 
                         linewidth=4,
                     )
 
-                    colors = cycle(["aqua", "darkorange", "cornflowerblue"])
+                    colors = cycle(["aqua", "darkorange", "cornflowerblue", 'red','green','yellow'])
                     for i, color in zip(model.classes_, colors):
                         plt.plot(
                             fpr[i],
@@ -305,8 +305,6 @@ def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None, 
                     plt.title("Some extension of Receiver operating characteristic to multiclass")
                     plt.legend(loc="lower right")
                     plt.show()
-
-
         else:
             evalMetric[metric] = metricDict[metric](yTest,yPred)
             if metric == 'confusionMatrix':
