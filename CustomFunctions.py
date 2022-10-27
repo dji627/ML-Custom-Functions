@@ -315,19 +315,27 @@ def fitAndEvaulateModel(xTrain, xTest, yTrain, yTest, model, metricList = None, 
                 print (evalMetric[metric])
     return evalMetric
 
-def crossValidate(df, output, model, n_splits = 5, shuffle = False, random_state = None, metricList = None):
+def crossValidate(df, output, model, metricList = None, **stratified_k_fold_args):
     x = df.loc[:, df.columns != output].values
     y = df.loc[:, df.columns == output].values.ravel()
     metricHash = collections.defaultdict(list) #hashtable with a list value
-    kf = StratifiedKFold(n_splits = n_splits, shuffle = shuffle, random_state = random_state)
+
+    kf = StratifiedKFold(**stratified_k_fold_args)
     for trainIndex, testIndex in kf.split(x,y): #looping through the train and test set indices for the splits
         evalMetric = fitAndEvaulateModel(x[trainIndex], x[testIndex], y[trainIndex], y[testIndex], model, metricList = metricList)
         for m in evalMetric.keys():
             metricHash[m].append(evalMetric[m])
     # print(f'{model} : {n_splits} fold cross validation result: {np.mean(metricList):.3f}+/-{np.std(metricList):.3f}')
-    print(f'{model}: {n_splits} fold cross validation result:')
+    print(f'{model}: {kf.get_n_splits()} fold cross validation result:')
     for m in metricHash:
         print(f'{m}: {np.mean(metricHash[m]):.3f}+/-{np.std(metricHash[m]):.3f}')
+
+def batchCrossValidate(modelList, *args, **kwargs):
+    for model in modelList:
+        #crossValidate(df=*args[0], output=*args[1], model=model, n_splits=**kwargs[n_splits], shuffle=**kwargs[shuffle], random_state = **kwargs[random_state], metricList = **kwargs[metricList])
+        pass
+
+
 def gridSearch(df, output, model, param_grid, scoring = None, n_jobs = None, refit = True, cv = 5, verbose = 0,
         pre_dispatch = None, error_score = np.nan, return_train_score = False, show_graph = None, print_results = None):
     x = df.loc[:, df.columns != output].values
