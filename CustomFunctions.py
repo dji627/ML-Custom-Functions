@@ -22,15 +22,15 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import *
 
-def importFile(file_path, file_name, show_dataFrame = False, **read_csv_kwargs):
+def importFile(file_path, file_name, column_names = None, show_dataFrame = False, **read_csv_kwargs):
     filePath = file_path + file_name
     if column_names != None:
         column_names = stringToList(column_names)
     if (type(column_names) == list): #check to see if column names are provided
-        df = pd.read_csv(filePath, sep = sep, names = column_names)
+        df = pd.read_csv(filePath, column_names, **read_csv_kwargs)
         features = column_names
     else:
-        df = pd.read_csv(filePath, sep = sep)
+        df = pd.read_csv(filePath, **read_csv_kwargs)
     if show_dataFrame != False:
         print(df.head(show_dataFrame))
     return df

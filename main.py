@@ -13,7 +13,7 @@ print(features)
 #showGraph(df,output='Failure Type', plot_type='summaryPlot')
 
 #exploratoryAnalysis(df, output = 'Failure Type', feature_selected=None,plot_type='histo',fig_size_y = 20,fig_size_x = 40)
-df2 = preprocessing(df,preprocess_type = 'featToRemove', feature_selected = ['\ufeffUDI', 'Product ID'])
+df2 = preprocessing(df,preprocess_type = 'featToRemove', feature_selected = ['UDI', 'Product ID'])
 
 featuresToNormalize = 'Air temperature [K],Process temperature [K],Tool wear [min]'
 featuresToStandardize = 'Torque [Nm]'
