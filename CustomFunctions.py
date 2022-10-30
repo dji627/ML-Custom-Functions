@@ -22,7 +22,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import *
 
-def importFile(file_path, file_name, column_names = None, sep = None, show_dataFrame = False):
+def importFile(file_path, file_name, show_dataFrame = False, **read_csv_kwargs):
     filePath = file_path + file_name
     if column_names != None:
         column_names = stringToList(column_names)
