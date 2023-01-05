@@ -72,32 +72,32 @@ def exploreFeatures(df, feature_selected = 'All', exploration_type = None,fig_si
 
 
 
-def showDataInfo(df, features_to_display = 'All', show_data_frame = True, show_rows = 5, show_data_type = False):
-    print ('Function: showDataInfo called')
+def showDataInfo(df, features_to_display = 'All', show_features_applied = False, show_rows = 5, show_data_type = True, show_data_details = False):
     featuresToApply = selectingFeatures(df, features_to_display)
-    if show_data_frame == True:
+    if show_features_applied == True:
         print (df[featuresToApply].head(show_rows))
     if show_data_type == True:
         print (df[featuresToApply].dtypes)
-    for col in featuresToApply:
-        if df[col].isnull().values.any() == True:
-            print(f'{col}: contains missing value, needs handling\n\n')
-        elif is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
-            max = df[col].max()
-            min = df[col].min()
-            median = df[col].median()
-            mean = df[col].mean()
-            mode = df[col].mode()
-            std = df[col].std()
-            skewness = df[col].skew()
-            print(f'{col}: Max:{max}, Min:{min}, Median:{median:.3f}'
-                                         f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}, Skewness:{skewness:.3f}')
-        elif is_object_dtype(df[col]) == True:
-            uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
-            print(f'{col}({len(uniqueVal)} unique values:)')
-            for value, count in zip(uniqueVal, uniqueCount):
-                print (f'{value}: {count}')
-        print('\n')
+    if show_data_details == True:
+        for col in featuresToApply:
+            if df[col].isnull().values.any() == True:
+                print(f'{col}: contains missing value, needs handling\n\n')
+            elif is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
+                max = df[col].max()
+                min = df[col].min()
+                median = df[col].median()
+                mean = df[col].mean()
+                mode = df[col].mode()
+                std = df[col].std()
+                skewness = df[col].skew()
+                print(f'{col}: Max:{max}, Min:{min}, Median:{median:.3f}'
+                                             f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}, Skewness:{skewness:.3f}')
+            elif is_object_dtype(df[col]) == True:
+                uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
+                print(f'{col}({len(uniqueVal)} unique values:)')
+                for value, count in zip(uniqueVal, uniqueCount):
+                    print (f'{value}: {count}')
+            print('\n')
 def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = None, ordinal_encode = None,
                   apply_log=None, remove_outlier = None,min_max_scaler = None, remove_feature = None,
                   convert_feature = None, convert_to = None):
