@@ -8,7 +8,7 @@ from helperFunctions import *
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype, is_datetime64_any_dtype, is_bool_dtype
+from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype, is_datetime64_any_dtype, is_bool_dtype, is_categorical_dtype
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler,label_binarize
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -21,6 +21,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import *
+from sklearn.impute import SimpleImputer, KNNImputer
 
 def importFile(file_path, file_name, column_names = None, show_dataFrame = False, **read_csv_kwargs):
     filePath = file_path + file_name
@@ -80,10 +81,10 @@ def showDataInfo(df, features_to_display = 'All', display_data_frame = False, sh
         print (df[featuresToApply].dtypes)
     if show_data_details == True:
         for col in featuresToApply:
-            print (f'Feature: {col}---------')
+            print (f'Feature: {col}---------Type: {df[col].dtypes}')
             if df[col].isnull().values.any() == True:
-                print(f'{col}: contains missing value, needs handling\n\n')
-            elif is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
+                print(f'{col}: contains {df[col].isna().sum()} missing values (out of {df[col].shape[0]}), needs handling\n')
+            if is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
                 max = df[col].max()
                 min = df[col].min()
                 median = df[col].median()
@@ -93,6 +94,9 @@ def showDataInfo(df, features_to_display = 'All', display_data_frame = False, sh
                 skewness = df[col].skew()
                 print(f'{col}: Max:{max}, Min:{min}, Median:{median:.3f}'
                                              f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}, Skewness:{skewness:.3f}')
+                print('(-0.5 < skewness < 0.5) -> fairly symmetrical')
+                print('(-1 < skewness < -0.5) or (0.5 < skewness < 1) -> moderately skewed')
+                print('(skewness < -1) or ( 1 < skewness) -> highly skewed')
             elif is_object_dtype(df[col]) == True:
                 uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
                 print(f'{col}({len(uniqueVal)} unique values:)')
@@ -105,6 +109,8 @@ def showDataInfo(df, features_to_display = 'All', display_data_frame = False, sh
                 print (f'Oldest Date: {df[col].min()}')
                 print (f'Newest Date: {df[col].max()}')
             elif is_bool_dtype(df[col]):
+                print (df[col].value_counts())
+            elif is_categorical_dtype(df[col]):
                 print (df[col].value_counts())
             print('\n')
 def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = None, ordinal_encode = None,
@@ -129,7 +135,7 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
     return df
 
 def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_key = None, convert_to = None,missing_value_handle = None,
-                  value_to_remove = None, replace_value = None, skew_transformation = 'boxCox'):
+                  value_to_remove = None, replace_value = None, imputer = None,  skew_transformation = 'boxCox',**imputer_kwargs):
     print ('Function: preprocessing called')
     df = dataframe
     feature_selected = selectingFeatures(dataframe, feature_selected)
@@ -159,16 +165,30 @@ def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_
         elif convert_to == 'datetime':
             df[feature_selected] = pd.to_datetime(df[feature_selected])
         elif convert_to == 'category':
-            df[feature_selected] = df[feature_selected].astype({feature_selected:'category'})
+            df[feature_selected] = df[feature_selected].astype('category')
     elif preprocess_type == 'handleMissingValue':
         if missing_value_handle == 'removeMissingValue':
-            df.dropna(subset=feature_selected, inplace = True)
+            df = df.dropna(subset=feature_selected, inplace = False)
         elif missing_value_handle == 'removeSpecificValue':
             df[feature_selected] = df[feature_selected].replace(value_to_remove,np.NaN)
-            df.dropna(subset=feature_selected, inplace=True)
+            df = df.dropna(subset=feature_selected, inplace=False)
         elif missing_value_handle == 'replaceValue':
             print('replace values:', replace_value[0], replace_value[1])
+            # replacing replace_value[0] wiht replace_value[1]
             df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
+        elif missing_value_handle == 'forwardFill':
+            df[feature_selected] = df[feature_selected].fillna(axis = 0, method='ffill')
+        elif missing_value_handle == 'backwardFill':
+            df[feature_selected] = df[feature_selected].fillna(axis=0, method='bfill')
+        if imputer != None:
+            # check imputer type validity
+            if imputer not in ('mean','median','constant','most_frequent','knn'):
+                print('invalid imputer input')
+            elif imputer == 'knn':
+                knn = KNNImputer(**imputer_kwargs)
+            else:
+                imp = SimpleImputer(strategy = imputer, **imputer_kwargs)
+                df[feature_selected] = imp.fit_transform(df[feature_selected])
     elif preprocess_type == 'handleSkewedData':
         if skew_transformation == 'boxCox':
             for i in feature_selected:
