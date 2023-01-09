@@ -8,7 +8,7 @@ from helperFunctions import *
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype
+from pandas.api.types import is_int64_dtype, is_float_dtype, is_object_dtype, is_datetime64_any_dtype, is_bool_dtype
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler, StandardScaler,label_binarize
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -72,14 +72,15 @@ def exploreFeatures(df, feature_selected = 'All', exploration_type = None,fig_si
 
 
 
-def showDataInfo(df, features_to_display = 'All', show_features_applied = False, show_rows = 5, show_data_type = True, show_data_details = False):
+def showDataInfo(df, features_to_display = 'All', display_data_frame = False, show_rows = 5, show_data_type = True, show_data_details = False):
     featuresToApply = selectingFeatures(df, features_to_display)
-    if show_features_applied == True:
+    if display_data_frame == True:
         print (df[featuresToApply].head(show_rows))
     if show_data_type == True:
         print (df[featuresToApply].dtypes)
     if show_data_details == True:
         for col in featuresToApply:
+            print (f'Feature: {col}---------')
             if df[col].isnull().values.any() == True:
                 print(f'{col}: contains missing value, needs handling\n\n')
             elif is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
@@ -95,11 +96,20 @@ def showDataInfo(df, features_to_display = 'All', show_features_applied = False,
             elif is_object_dtype(df[col]) == True:
                 uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
                 print(f'{col}({len(uniqueVal)} unique values:)')
-                for value, count in zip(uniqueVal, uniqueCount):
+                for index, (value, count) in enumerate(zip(uniqueVal, uniqueCount)):
                     print (f'{value}: {count}')
+                    if index > 9:
+                        print ("...more than 10 unique value detected, consider feature type conversioin")
+                        break
+            elif is_datetime64_any_dtype(df[col]):
+                print (f'Oldest Date: {df[col].min()}')
+                print (f'Newest Date: {df[col].max()}')
+            elif is_bool_dtype(df[col]):
+                print (df[col].value_counts())
             print('\n')
 def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = None, ordinal_encode = None,
-                  apply_log=None, remove_outlier = None,min_max_scaler = None, remove_feature = None,
+                  apply_log=None, remove_outlier =
+                   None,min_max_scaler = None, remove_feature = None,
                   convert_feature = None, convert_to = None):
     print ('Function: preprocessing2 called')
     df = dataframe
@@ -146,6 +156,10 @@ def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_
             df[feature_selected] = df[feature_selected].astype(float)
         elif convert_to == 'string':
             df[feature_selected] = df[feature_selected].astype(str)
+        elif convert_to == 'datetime':
+            df[feature_selected] = pd.to_datetime(df[feature_selected])
+        elif convert_to == 'category':
+            df[feature_selected] = df[feature_selected].astype({feature_selected:'category'})
     elif preprocess_type == 'handleMissingValue':
         if missing_value_handle == 'removeMissingValue':
             df.dropna(subset=feature_selected, inplace = True)

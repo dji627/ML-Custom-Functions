@@ -3,7 +3,7 @@ def stringToList(string, seperator = ','):
 
 # to account for different input format of the targeted features
 # string_if_single: whether to make the feature a string or list if there is only 1 feature selected
-def selectingFeatures(df, feature_input, output = None, remove_output = False, string_if_single = False, show_features_applied = False):
+def selectingFeatures(df, feature_input, output = None, remove_output = False, string_if_single = True, show_features_applied = True):
     featuresToApply = None
     if feature_input == 'All':
         featuresToApply = list(df.columns)
