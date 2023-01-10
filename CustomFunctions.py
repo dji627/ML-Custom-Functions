@@ -77,6 +77,7 @@ def showDataInfo(df, features_to_display = 'All', display_data_frame = False, sh
     featuresToApply = selectingFeatures(df, features_to_display)
     if display_data_frame == True:
         print (df[featuresToApply].head(show_rows))
+        print (f'Total number of rows: {df.shape[0]}')
     if show_data_type == True:
         print (df[featuresToApply].dtypes)
     if show_data_details == True:
@@ -135,7 +136,7 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
     return df
 
 def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_key = None, convert_to = None,missing_value_handle = None,
-                  value_to_remove = None, replace_value = None, imputer = None,  skew_transformation = 'boxCox',**imputer_kwargs):
+                  value_to_remove = None, replace_value = None, imputer = None,  skew_transformation = 'boxCox',**kwargs):
     print ('Function: preprocessing called')
     df = dataframe
     feature_selected = selectingFeatures(dataframe, feature_selected)
@@ -176,19 +177,23 @@ def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_
             print('replace values:', replace_value[0], replace_value[1])
             # replacing replace_value[0] wiht replace_value[1]
             df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
+        elif missing_value_handle == 'fillna':
+            df[feature_selected] = df[feature_selected].fillna(replace_value,**kwargs)
         elif missing_value_handle == 'forwardFill':
-            df[feature_selected] = df[feature_selected].fillna(axis = 0, method='ffill')
+            df[feature_selected] = df[feature_selected].fillna(axis = 0, method='ffill',inplace = False,**kwargs)
         elif missing_value_handle == 'backwardFill':
-            df[feature_selected] = df[feature_selected].fillna(axis=0, method='bfill')
+            # df[feature_selected] = df[feature_selected].fillna(axis=0, method='bfill',inplace = False, **kwargs)
+            df = df.fillna(columns = feature_selected, method= 'bfill', **kwargs)
         if imputer != None:
             # check imputer type validity
             if imputer not in ('mean','median','constant','most_frequent','knn'):
                 print('invalid imputer input')
             elif imputer == 'knn':
-                knn = KNNImputer(**imputer_kwargs)
+                knn = KNNImputer(**kwargs)
+                df[feature_selected] = knn.fit_transform(df[[feature_selected]])
             else:
-                imp = SimpleImputer(strategy = imputer, **imputer_kwargs)
-                df[feature_selected] = imp.fit_transform(df[feature_selected])
+                imp = SimpleImputer(strategy = imputer, **kwargs)
+                df[feature_selected] = imp.fit_transform(df[[feature_selected]])
     elif preprocess_type == 'handleSkewedData':
         if skew_transformation == 'boxCox':
             for i in feature_selected:
