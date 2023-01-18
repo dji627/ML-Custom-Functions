@@ -3,6 +3,7 @@ from itertools import cycle
 import collections
 
 import math
+import os
 
 from helperFunctions import *
 import pandas as pd
@@ -36,28 +37,51 @@ def importFile(file_path, file_name, column_names = None, show_dataFrame = False
         print(df.head(show_dataFrame))
     return df
 
-def showGraph(df, output=None, feature_selected = 'All',plot_type = None,fig_size_y = 15, fig_size_x = 30,set_yscale = None,
-              set_xscale =None, kde = False, show_corrlation = False):
-    featuresToApply = selectingFeatures(df, feature_input= feature_selected, output = output)
+def showGraph(df, output=None, feature_selected = 'All', classification_or_regression = None,plot_type = None,set_yscale = None,
+              set_xscale =None, kde = False, show_corrlation = False,**kwargs):
+    featuresToApply = selectingFeatures(df, feature_input= feature_selected, output = output,string_if_single=False)
+    # set the hue of the plots, there will be no hue if the problem is regression
+    hue = None
+    if classification_or_regression == 'classification':
+        hue = output
     if plot_type != None:
-        plt.figure(figsize = (fig_size_y, fig_size_x))
+        plt.figure()
         plotCol = min(len(featuresToApply),3)
+
         for i, feature in enumerate(featuresToApply):
             plt.subplot(len(featuresToApply), plotCol, i + 1)
             if plot_type == 'scatter':
-                g = sns.scatterplot(data=df, x=feature, y=output, legend='auto')
+                g = sns.scatterplot(data=df, x=feature, y=hue, legend='auto',**kwargs)
             elif plot_type == 'histo':
-                g = sns.histplot(data=df, x=feature, hue=output, multiple='stack', kde = kde)
+                g = sns.histplot(data=df, x=feature, hue=hue, multiple='stack', kde = kde,**kwargs)
             elif plot_type == 'box':
                 g = sns.boxplot(x=df[feature])
             elif plot_type == 'pair':
-                g = sns.pairplot(df, hue=output, vars=feature)
+                g = sns.pairplot(df, hue=hue, vars=feature,**kwargs)
             elif plot_type == 'summaryPlot':
                 if is_float_dtype(df[feature]) or is_int64_dtype(df[feature]):
-                    g = sns.boxplot(data=df, x=feature, hue=output)
+                    g = sns.boxplot(data=df, x=feature, hue=hue)
+                    plt.show()
+                    g = sns.scatterplot(data=df,x=feature,y=output,legend='auto',**kwargs)
+                    plt.show()
+                    # setting bin size for histoplot
+                    if -0.5 < df[feature].skew() < 0.5: #Gaussian distribution
+                        bins = 'sturges'
+                    else: bins = 'doane' # skewed distribution
+                    g = sns.histplot(data=df,x=feature,hue=hue,bins=bins,multiple='stack',kde=kde,**kwargs)
                     print('feature is a number')
-                elif is_object_dtype(df[feature]):
-                    g = sns.countplot(data=df,x=feature, hue=output)
+                elif is_object_dtype(df[feature]) or is_categorical_dtype(df[feature]) or is_bool_dtype(df[feature]):
+                    g = sns.countplot(data=df,x=feature, hue=hue,**kwargs)
+                    if len(pd.unique(df[feature])) > 5:
+                        plt.xticks(rotation='vertical')
+                    plt.show()
+                    g = sns.scatterplot(data=df,x=feature,y=output,legend='auto',**kwargs)
+                    if len(pd.unique(df[feature])) > 5:
+                        plt.xticks(rotation='vertical')
+                    plt.show()
+                elif is_datetime64_any_dtype(df[feature]):
+                    g = sns.scatterplot(data=df,x=feature,y=output,legend='auto',**kwargs)
+
             if set_yscale == 'log':
                 g.set_yscale(set_yscale)
         plt.show()
@@ -73,47 +97,64 @@ def exploreFeatures(df, feature_selected = 'All', exploration_type = None,fig_si
 
 
 
-def showDataInfo(df, features_to_display = 'All', display_data_frame = False, show_rows = 5, show_data_type = True, show_data_details = False):
-    featuresToApply = selectingFeatures(df, features_to_display)
+def showDataInfo(df, features_to_display = 'All', display_data_frame = False, show_rows = 5, show_data_type = True,
+                 show_data_details = False, show_graph = False, classification_or_regression = None, output = None,**kwargs):
+    featuresToApply = selectingFeatures(df, features_to_display,string_if_single=False)
     if display_data_frame == True:
         print (df[featuresToApply].head(show_rows))
         print (f'Total number of rows: {df.shape[0]}')
+        print('=' * 50)
     if show_data_type == True:
         print (df[featuresToApply].dtypes)
+        print('=' * 50)
     if show_data_details == True:
         for col in featuresToApply:
             print (f'Feature: {col}---------Type: {df[col].dtypes}')
             if df[col].isnull().values.any() == True:
-                print(f'{col}: contains {df[col].isna().sum()} missing values (out of {df[col].shape[0]}), needs handling\n')
+                print(f'{col}: contains {df[col].isna().sum()} out of {df[col].shape[0]} missing values ({df[col].isna().sum()/df[col].shape[0]:.3f}%, needs handling\n')
             if is_int64_dtype(df[col]) == True or is_float_dtype(df[col]) == True:
-                max = df[col].max()
-                min = df[col].min()
+                maximum = df[col].max()
+                minimum = df[col].min()
                 median = df[col].median()
                 mean = df[col].mean()
                 mode = df[col].mode()
                 std = df[col].std()
                 skewness = df[col].skew()
-                print(f'{col}: Max:{max}, Min:{min}, Median:{median:.3f}'
-                                             f' Mean:{mean:.3f}, std:{std:.3f}, Mode:{mode}, Skewness:{skewness:.3f}')
+                print(f'{col}: Max:{maximum}, Min:{minimum}, Median:{median:.3f}'
+                                             f' Mean:{mean:.3f}, std:{std:.3f},Skewness:{skewness:.3f}')
+                modeCount = min(mode.shape[0],5)
+                print (f'mode: {mode.shape[0]} modes in total\n{mode.head(modeCount)}')
+                #info to determine th skewness
                 print('(-0.5 < skewness < 0.5) -> fairly symmetrical')
                 print('(-1 < skewness < -0.5) or (0.5 < skewness < 1) -> moderately skewed')
                 print('(skewness < -1) or ( 1 < skewness) -> highly skewed')
-            elif is_object_dtype(df[col]) == True:
-                uniqueVal, uniqueCount = np.unique(df.loc[:, col], return_counts=True)
-                print(f'{col}({len(uniqueVal)} unique values:)')
-                for index, (value, count) in enumerate(zip(uniqueVal, uniqueCount)):
-                    print (f'{value}: {count}')
+
+
+            elif is_object_dtype(df[col]):
+                uniqueCountTable = df[col].value_counts()
+                print(f'{col}({len(pd.unique(df[col]))} unique values:)')
+                nullCount = df[col].isnull().sum()
+                if nullCount != 0: #including null values if any
+                    print (f'NaN: {nullCount}')
+                for index, (value, count) in enumerate(uniqueCountTable.items()):
+                    print(f'{value}: {count}')
                     if index > 9:
-                        print ("...more than 10 unique value detected, consider feature type conversioin")
+                        print("...more than 10 unique value detected, consider feature type conversion")
                         break
             elif is_datetime64_any_dtype(df[col]):
                 print (f'Oldest Date: {df[col].min()}')
                 print (f'Newest Date: {df[col].max()}')
-            elif is_bool_dtype(df[col]):
-                print (df[col].value_counts())
-            elif is_categorical_dtype(df[col]):
-                print (df[col].value_counts())
-            print('\n')
+
+            elif is_categorical_dtype(df[col]) or is_bool_dtype(df[col]):
+                print(f'{len(pd.unique(df[col]))} unique values:)\n'+'='*30)
+                nullCount = df[col].isnull().sum()
+                if nullCount != 0:  # including null values if any
+                    print(f'NaN: {nullCount}')
+                print(df[col].value_counts())
+            if show_graph:
+                showGraph(df,output=output,feature_selected=col,classification_or_regression=classification_or_regression
+                          ,plot_type='summaryPlot',**kwargs)
+            print('='*50)
 def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = None, ordinal_encode = None,
                   apply_log=None, remove_outlier =
                    None,min_max_scaler = None, remove_feature = None,
@@ -138,7 +179,7 @@ def preprocessing2(dataframe, handle_missing_values = None, one_hot_encode = Non
 def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_key = None, convert_to = None,missing_value_handle = None,
                   value_to_remove = None, replace_value = None, imputer = None,  skew_transformation = 'boxCox',**kwargs):
     print ('Function: preprocessing called')
-    df = dataframe
+    df = dataframe.copy()
     feature_selected = selectingFeatures(dataframe, feature_selected)
     if preprocess_type == 'featToRemove':
         df = df.drop(columns = feature_selected, inplace = False)
@@ -167,6 +208,11 @@ def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_
             df[feature_selected] = pd.to_datetime(df[feature_selected])
         elif convert_to == 'category':
             df[feature_selected] = df[feature_selected].astype('category')
+        elif convert_to == 'bool':
+            df[feature_selected] = df[feature_selected].astype('bool')
+        elif convert_to == 'object':
+            print ('here')
+            df[feature_selected] = df[feature_selected].astype('object')
     elif preprocess_type == 'handleMissingValue':
         if missing_value_handle == 'removeMissingValue':
             df = df.dropna(subset=feature_selected, inplace = False)
@@ -178,12 +224,16 @@ def preprocessing(dataframe, preprocess_type, feature_selected = 'All', encoder_
             # replacing replace_value[0] wiht replace_value[1]
             df[feature_selected] = df[feature_selected].replace(replace_value[0], replace_value[1])
         elif missing_value_handle == 'fillna':
-            df[feature_selected] = df[feature_selected].fillna(replace_value,**kwargs)
+            # categorical type requires the category be added to feature
+            if is_categorical_dtype(df[feature_selected]):
+                df[feature_selected].cat.add_categories(replace_value).fillna(replace_value)
+            else:
+                df[feature_selected] = df[feature_selected].fillna(replace_value,**kwargs)
         elif missing_value_handle == 'forwardFill':
             df[feature_selected] = df[feature_selected].fillna(axis = 0, method='ffill',inplace = False,**kwargs)
         elif missing_value_handle == 'backwardFill':
-            # df[feature_selected] = df[feature_selected].fillna(axis=0, method='bfill',inplace = False, **kwargs)
-            df = df.fillna(columns = feature_selected, method= 'bfill', **kwargs)
+            df[feature_selected] = df[feature_selected].fillna(axis=0, method='bfill',inplace = False, **kwargs)
+            #df = df.fillna(columns = feature_selected, method= 'bfill', **kwargs)
         if imputer != None:
             # check imputer type validity
             if imputer not in ('mean','median','constant','most_frequent','knn'):

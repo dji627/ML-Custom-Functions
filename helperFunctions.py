@@ -19,6 +19,7 @@ def selectingFeatures(df, feature_input, output = None, remove_output = False, s
         featuresToApply = featuresToApply[0]
     if show_features_applied == True:
         print (f'features selected: {featuresToApply}')
+        print(type(featuresToApply))
     return featuresToApply
 
 def convertToList(input):
